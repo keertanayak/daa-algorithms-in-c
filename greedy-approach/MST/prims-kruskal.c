@@ -4,25 +4,23 @@
 #include <time.h>
 
 #define MAXV 25
-#define MAXE 100
+#define MAXE 200
 #define ITERATIONS 10000
 
-// edge structure for kruskal
 typedef struct {
     int src, dest, weight;
 } Edge;
 
-// adjacency list node for prim
 typedef struct Node {
     int dest, weight;
     struct Node* next;
 } Node;
 
-Node* adj[MAXV];      // adjacency list
-Edge edges[MAXE];     // edge list
+Node* adj[MAXV];
+Edge edges[MAXE];
 int edgeCount = 0;
 
-// add edge to both representations
+// add edge to both adjacency list and edge list
 void addEdge(int u, int v, int w) {
     Node* node = (Node*)malloc(sizeof(Node));
     node->dest = v;
@@ -39,7 +37,7 @@ void addEdge(int u, int v, int w) {
     edges[edgeCount++] = (Edge){u, v, w};
 }
 
-// free adjacency list
+// free graph memory
 void clearGraph(int V) {
     for (int i = 0; i < V; i++) {
         Node* temp = adj[i];
@@ -53,19 +51,30 @@ void clearGraph(int V) {
     edgeCount = 0;
 }
 
-// sample graph
-void createGraph(int V) {
+// generate a connected random graph
+void generateGraph(int V, int E) {
     clearGraph(V);
 
-    addEdge(0, 1, 4);
-    addEdge(0, 2, 8);
-    addEdge(1, 2, 11);
-    addEdge(1, 3, 8);
-    addEdge(2, 4, 7);
-    addEdge(2, 5, 1);
-    addEdge(3, 4, 2);
-    addEdge(3, 6, 7);
-    addEdge(4, 5, 6);
+    // step 1: create a spanning tree to ensure connectivity
+    for (int i = 1; i < V; i++) {
+        int parent = rand() % i;               // connect to any previous node
+        int weight = rand() % 20 + 1;
+        addEdge(parent, i, weight);
+    }
+
+    // step 2: add remaining edges randomly
+    int extraEdges = E - (V - 1);
+
+    while (extraEdges > 0) {
+        int u = rand() % V;
+        int v = rand() % V;
+
+        if (u != v) {                         // avoid self-loop
+            int weight = rand() % 20 + 1;
+            addEdge(u, v, weight);
+            extraEdges--;
+        }
+    }
 }
 
 // prim's algorithm
@@ -77,25 +86,28 @@ int primMST(int V) {
     for (int i = 0; i < V; i++)
         key[i] = INT_MAX;
 
-    key[0] = 0;
+    key[0] = 0;  // start from vertex 0
 
     for (int count = 0; count < V; count++) {
         int u = -1;
 
-        // pick minimum key vertex not yet included
+        // select minimum key vertex not yet included in mst
         for (int i = 0; i < V; i++)
             if (!visited[i] && (u == -1 || key[i] < key[u]))
                 u = i;
 
         visited[u] = 1;
-        total += key[u];
+        total += key[u];  // add weight of chosen edge
 
-        // update adjacent vertices
+        // update keys for adjacent vertices
         Node* temp = adj[u];
         while (temp) {
             int v = temp->dest;
+
+            // relax edge if better option found
             if (!visited[v] && temp->weight < key[v])
                 key[v] = temp->weight;
+
             temp = temp->next;
         }
     }
@@ -122,6 +134,7 @@ void unionSet(int a, int b) {
     b = findSet(b);
 
     if (a != b) {
+        // attach smaller tree under larger tree
         if (rankArr[a] < rankArr[b])
             parent[a] = b;
         else if (rankArr[a] > rankArr[b])
@@ -133,7 +146,7 @@ void unionSet(int a, int b) {
     }
 }
 
-// comparator for sorting edges
+// sort edges by weight
 int cmp(const void* a, const void* b) {
     return ((Edge*)a)->weight - ((Edge*)b)->weight;
 }
@@ -145,17 +158,16 @@ int kruskalMST(int V) {
     for (int i = 0; i < V; i++)
         makeSet(i);
 
-    int total = 0;
-    int count = 0;
+    int total = 0, count = 0;
 
     for (int i = 0; i < edgeCount && count < V - 1; i++) {
         Edge e = edges[i];
 
-        // include edge if it does not form a cycle
+        // include edge only if it doesn't form a cycle
         if (findSet(e.src) != findSet(e.dest)) {
             total += e.weight;
             unionSet(e.src, e.dest);
-            count++;
+            count++;  // mst grows by one edge
         }
     }
 
@@ -163,15 +175,19 @@ int kruskalMST(int V) {
 }
 
 int main() {
-    int V = 7;
+    srand(time(NULL));
+
+    int V = 10;
+    int E = 20;
 
     printf("Minimum Spanning Tree\n");
 
-    createGraph(V);
+    // generate random connected graph
+    generateGraph(V, E);
 
     clock_t start, end;
 
-    // prim timing
+    // measure prim's time
     start = clock();
     for (int i = 0; i < ITERATIONS; i++)
         primMST(V);
@@ -180,7 +196,7 @@ int main() {
     double primTime = ((double)(end - start) * 1000000) / (CLOCKS_PER_SEC * ITERATIONS);
     int primWeight = primMST(V);
 
-    // kruskal timing
+    // measure kruskal's time
     start = clock();
     for (int i = 0; i < ITERATIONS; i++)
         kruskalMST(V);
